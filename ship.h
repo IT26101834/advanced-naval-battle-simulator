@@ -9,6 +9,10 @@ typedef struct {
     double x;
     double y;
     double maxVelocity;
+
+    double health;
+    double cumulativeDamage;
+
     int alive;
 } Battleship;
 
@@ -27,6 +31,8 @@ typedef struct {
     double maxAngle;
 
     double impactPower;
+
+    double health;
 
     int alive;
 } EscortShip;

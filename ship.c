@@ -57,7 +57,7 @@ double escortAngleRange(const char *type)
     return 70.0;
 }
 
-/* Return full Battleship name */
+/* Return Battleship name */
 const char *battleshipName(char type)
 {
     switch (type) {
@@ -119,6 +119,10 @@ void initializeBattlefield(
     field->battleship.maxVelocity =
         battleshipMaxVelocity;
 
+    field->battleship.health = 1.0;
+
+    field->battleship.cumulativeDamage = 0.0;
+
     field->battleship.alive = 1;
 
     /* Escort ship setup */
@@ -173,6 +177,8 @@ void initializeBattlefield(
                 escort->type
             );
 
+        escort->health = 1.0;
+
         escort->alive = 1;
     }
 }
@@ -199,6 +205,12 @@ void displayBattlefield(
         field->battleship.x,
         field->battleship.y,
         field->battleship.maxVelocity
+    );
+
+    printf(
+        "Battleship Health: %.2f | Damage: %.2f\n",
+        field->battleship.health,
+        field->battleship.cumulativeDamage
     );
 
     printf(
