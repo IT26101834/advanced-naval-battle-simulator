@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+
 /* Create results folder if it does not exist */
 int ensureResultsDirectory(void)
 {
@@ -14,10 +15,12 @@ int ensureResultsDirectory(void)
     }
 
     printf("Cannot create results directory.\n");
+
     return 0;
 }
 
-/* Save battlefield information to a text file */
+
+/* Save complete battlefield information */
 int saveBattlefield(
     const Battlefield *field,
     const char *filename,
@@ -52,7 +55,9 @@ int saveBattlefield(
         field->seed
     );
 
-    fprintf(file, "Battleship\n");
+
+    /* Battleship information */
+    fprintf(file, "BATTLESHIP\n");
 
     fprintf(
         file,
@@ -75,15 +80,55 @@ int saveBattlefield(
 
     fprintf(
         file,
+        "Health: %.3f\n",
+        field->battleship.health
+    );
+
+    fprintf(
+        file,
+        "Cumulative Damage: %.3f\n",
+        field->battleship.cumulativeDamage
+    );
+
+    fprintf(
+        file,
+        "Firing Interval: %.2f\n",
+        field->battleship.firingInterval
+    );
+
+    fprintf(
+        file,
+        "Firing Count: %d\n",
+        field->battleship.firingCount
+    );
+
+    fprintf(
+        file,
+        "Gamma: %.4f\n",
+        field->battleship.gamma
+    );
+
+    fprintf(
+        file,
+        "Current Impact Power: %.4f\n",
+        field->battleship.currentImpactPower
+    );
+
+    fprintf(
+        file,
         "State: %s\n",
         field->battleship.alive
             ? "alive"
             : "destroyed"
     );
 
-    fprintf(file, "\nEscort Ships\n");
 
-    for (i = 0; i < field->escortCount; i++) {
+    /* Escort ship information */
+    fprintf(file, "\nESCORT SHIPS\n");
+
+    for (i = 0;
+         i < field->escortCount;
+         i++) {
 
         const EscortShip *escort =
             &field->escorts[i];
@@ -123,8 +168,38 @@ int saveBattlefield(
 
         fprintf(
             file,
-            "Impact Power: %.2f\n",
+            "Initial Impact Power: %.3f\n",
             escort->impactPower
+        );
+
+        fprintf(
+            file,
+            "Health: %.3f\n",
+            escort->health
+        );
+
+        fprintf(
+            file,
+            "Firing Interval: %.2f\n",
+            escort->firingInterval
+        );
+
+        fprintf(
+            file,
+            "Firing Count: %d\n",
+            escort->firingCount
+        );
+
+        fprintf(
+            file,
+            "Gamma: %.4f\n",
+            escort->gamma
+        );
+
+        fprintf(
+            file,
+            "Current Impact Power: %.4f\n",
+            escort->currentImpactPower
         );
 
         fprintf(
@@ -141,7 +216,8 @@ int saveBattlefield(
     return 1;
 }
 
-/* Add text to an existing result file */
+
+/* Add normal text to a result file */
 int appendText(
     const char *filename,
     const char *text)
@@ -165,7 +241,8 @@ int appendText(
     return 1;
 }
 
-/* Save details about a successful hit */
+
+/* Save one successful shot */
 int saveHit(
     const char *filename,
     const HitRecord *hit,
@@ -198,8 +275,80 @@ int saveHit(
     return 1;
 }
 
-/* Statistics will be completed in Commit 5 */
+
+/* Display one saved text file */
+static int displayResultFile(
+    const char *filename)
+{
+    FILE *file;
+    char line[300];
+
+    file = fopen(filename, "r");
+
+    if (file == NULL) {
+        return 0;
+    }
+
+    printf(
+        "\n------------------------------------\n"
+    );
+
+    printf(
+        "File: %s\n",
+        filename
+    );
+
+    printf(
+        "------------------------------------\n"
+    );
+
+    while (fgets(
+               line,
+               sizeof(line),
+               file) != NULL) {
+
+        printf("%s", line);
+    }
+
+    fclose(file);
+
+    return 1;
+}
+
+
+/* Load previous simulation results */
 void showStatistics(void)
 {
-    printf("\nSimulation statistics will be added later.\n");
+    int found = 0;
+
+    printf(
+        "\n========== SIMULATION STATISTICS ==========\n"
+    );
+
+    found += displayResultFile(
+        "results/part1a_final.txt"
+    );
+
+    found += displayResultFile(
+        "results/part1c_final.txt"
+    );
+
+    found += displayResultFile(
+        "results/part2a_final.txt"
+    );
+
+    found += displayResultFile(
+        "results/part2b_final.txt"
+    );
+
+    found += displayResultFile(
+        "results/part2c_final.txt"
+    );
+
+    if (found == 0) {
+
+        printf(
+            "No saved simulation results available.\n"
+        );
+    }
 }

@@ -6,15 +6,24 @@
 /* Battleship data */
 typedef struct {
     char type;
+
     double x;
     double y;
+
     double maxVelocity;
 
     double health;
     double cumulativeDamage;
 
+    /* Part 2 values */
+    double firingInterval;
+    int firingCount;
+    double gamma;
+    double currentImpactPower;
+
     int alive;
 } Battleship;
+
 
 /* Escort ship data */
 typedef struct {
@@ -34,8 +43,15 @@ typedef struct {
 
     double health;
 
+    /* Part 2 values */
+    double firingInterval;
+    int firingCount;
+    double gamma;
+    double currentImpactPower;
+
     int alive;
 } EscortShip;
+
 
 /* Complete battlefield */
 typedef struct {
@@ -52,6 +68,7 @@ typedef struct {
 
 
 /* Function declarations */
+
 void initializeBattlefield(
     Battlefield *field,
     double size,

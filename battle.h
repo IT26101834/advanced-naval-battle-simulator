@@ -11,7 +11,9 @@ typedef struct {
     double angle;
 } HitRecord;
 
+
 /* Projectile functions */
+
 double calculateDistance(
     double x1,
     double y1,
@@ -43,7 +45,9 @@ int findShotSolution(
     HitRecord *solution
 );
 
+
 /* Part 1 simulations */
+
 void runPart1A(
     Battlefield *field,
     int cumulative,
@@ -55,6 +59,23 @@ void runPart1B(
     int points,
     double jamAngle,
     int cumulative
+);
+
+
+/* Part 2 simulations */
+
+void runPart2A(
+    Battlefield *field
+);
+
+void runPart2B(
+    Battlefield *field,
+    double maximumTime
+);
+
+void runPart2C(
+    Battlefield *field,
+    double maximumTime
 );
 
 #endif

@@ -125,6 +125,12 @@ void initializeBattlefield(
 
     field->battleship.alive = 1;
 
+    /* Part 2 default values */
+    field->battleship.firingInterval = 5.0;
+    field->battleship.firingCount = 0;
+    field->battleship.gamma = 0.02;
+    field->battleship.currentImpactPower = 1.0;
+
     /* Escort ship setup */
     for (i = 0; i < escortCount; i++) {
 
@@ -152,7 +158,6 @@ void initializeBattlefield(
         escort->maxVelocity =
             randomBetween(45.0, 80.0);
 
-        /* EA can have higher maximum velocity */
         if (strcmp(escort->type, "EA") == 0) {
 
             escort->maxVelocity =
@@ -180,6 +185,33 @@ void initializeBattlefield(
         escort->health = 1.0;
 
         escort->alive = 1;
+
+        /* Part 2 default values */
+        escort->firingCount = 0;
+
+        escort->currentImpactPower =
+            escort->impactPower;
+
+        if (strcmp(escort->type, "EA") == 0) {
+            escort->firingInterval = 6.0;
+            escort->gamma = 0.05;
+        }
+        else if (strcmp(escort->type, "EB") == 0) {
+            escort->firingInterval = 7.0;
+            escort->gamma = 0.06;
+        }
+        else if (strcmp(escort->type, "EC") == 0) {
+            escort->firingInterval = 8.0;
+            escort->gamma = 0.07;
+        }
+        else if (strcmp(escort->type, "ED") == 0) {
+            escort->firingInterval = 9.0;
+            escort->gamma = 0.08;
+        }
+        else {
+            escort->firingInterval = 10.0;
+            escort->gamma = 0.09;
+        }
     }
 }
 
@@ -211,6 +243,13 @@ void displayBattlefield(
         "Battleship Health: %.2f | Damage: %.2f\n",
         field->battleship.health,
         field->battleship.cumulativeDamage
+    );
+
+    printf(
+        "B firing interval: %.2f | Gamma: %.3f | Impact: %.2f\n",
+        field->battleship.firingInterval,
+        field->battleship.gamma,
+        field->battleship.currentImpactPower
     );
 
     printf(

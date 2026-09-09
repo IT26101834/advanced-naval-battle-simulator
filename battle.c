@@ -1,19 +1,22 @@
 #include <stdlib.h>
+
 #include "battle.h"
 #include "fileio.h"
+#include "strategy.h"
 
 #include <math.h>
 #include <stdio.h>
-#include <string.h>
 
 #define GRAVITY 9.81
 #define PI 3.14159265358979323846
+
 
 /* Convert degrees to radians */
 double degreesToRadians(double degrees)
 {
     return degrees * PI / 180.0;
 }
+
 
 /* Calculate distance between two ships */
 double calculateDistance(
@@ -28,12 +31,14 @@ double calculateDistance(
     return sqrt(dx * dx + dy * dy);
 }
 
+
 /* Projectile range formula */
 double projectileRange(
     double velocity,
     double angle)
 {
-    double radians = degreesToRadians(angle);
+    double radians =
+        degreesToRadians(angle);
 
     return (
         velocity * velocity *
@@ -41,14 +46,20 @@ double projectileRange(
     ) / GRAVITY;
 }
 
-/* Approximate flight time */
+
+/* Calculate approximate flight time */
 double calculateFlightTime(
     double distance,
     double velocity,
     double angle)
 {
-    double radians = degreesToRadians(angle);
-    double horizontalSpeed =
+    double radians;
+    double horizontalSpeed;
+
+    radians =
+        degreesToRadians(angle);
+
+    horizontalSpeed =
         velocity * cos(radians);
 
     if (horizontalSpeed <= 0.0) {
@@ -58,7 +69,8 @@ double calculateFlightTime(
     return distance / horizontalSpeed;
 }
 
-/* Find a simple valid projectile solution */
+
+/* Find a possible projectile shot */
 int findShotSolution(
     double distance,
     double minVelocity,
@@ -107,16 +119,17 @@ int findShotSolution(
     return 0;
 }
 
-/* Check whether one Escort can hit B */
+
+/* Check whether an Escort can hit B */
 static int escortCanHitBattleship(
     const Battlefield *field,
     int index,
     HitRecord *solution)
 {
-    const EscortShip *escort =
-        &field->escorts[index];
-
+    const EscortShip *escort;
     double distance;
+
+    escort = &field->escorts[index];
 
     if (!escort->alive) {
         return 0;
@@ -142,6 +155,7 @@ static int escortCanHitBattleship(
     );
 }
 
+
 /* Check whether B can hit an Escort */
 static int battleshipCanHitEscort(
     const Battlefield *field,
@@ -149,10 +163,10 @@ static int battleshipCanHitEscort(
     double minAngle,
     HitRecord *solution)
 {
-    const EscortShip *escort =
-        &field->escorts[index];
-
+    const EscortShip *escort;
     double distance;
+
+    escort = &field->escorts[index];
 
     if (!escort->alive) {
         return 0;
@@ -179,6 +193,43 @@ static int battleshipCanHitEscort(
     );
 }
 
+
+/* Count alive Escort ships */
+static int countAliveEscorts(
+    const Battlefield *field)
+{
+    int i;
+    int count = 0;
+
+    for (i = 0;
+         i < field->escortCount;
+         i++) {
+
+        if (field->escorts[i].alive) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+
+/* Clear one result file */
+static void clearResultFile(
+    const char *filename)
+{
+    FILE *file;
+
+    ensureResultsDirectory();
+
+    file = fopen(filename, "w");
+
+    if (file != NULL) {
+        fclose(file);
+    }
+}
+
+
 /* Part 1-A and Part 1-C */
 void runPart1A(
     Battlefield *field,
@@ -187,6 +238,7 @@ void runPart1A(
 {
     int i;
     int hitCount = 0;
+
     double battleTime = 0.0;
 
     HitRecord hit;
@@ -224,57 +276,88 @@ void runPart1A(
         "Initial Battlefield"
     );
 
-    /* Clear previous hit file */
-    {
-        FILE *file = fopen(hitsFile, "w");
+    clearResultFile(hitsFile);
 
-        if (file != NULL) {
-            fclose(file);
+    /*
+     * Part 1-A:
+     * Find the Escort shell with
+     * the earliest impact time.
+     */
+    if (!cumulative) {
+
+        int attackerIndex = -1;
+        double earliestTime = 0.0;
+        HitRecord earliestHit;
+
+        for (i = 0;
+             i < field->escortCount;
+             i++) {
+
+            if (escortCanHitBattleship(
+                    field,
+                    i,
+                    &hit)) {
+
+                if (attackerIndex == -1 ||
+                    hit.time < earliestTime) {
+
+                    attackerIndex = i;
+                    earliestTime = hit.time;
+                    earliestHit = hit;
+                }
+            }
+        }
+
+        if (attackerIndex != -1) {
+
+            field->battleship.alive = 0;
+            field->battleship.health = 0.0;
+
+            earliestHit.targetId =
+                field->escorts[
+                    attackerIndex
+                ].id;
+
+            saveHit(
+                hitsFile,
+                &earliestHit,
+                "Escort"
+            );
+
+            printf(
+                "\nBattleship was destroyed by Escort %d.\n",
+                field->escorts[
+                    attackerIndex
+                ].id
+            );
         }
     }
 
     /*
-     * Escort attacks first.
-     * Part 1-A: one hit sinks B.
-     * Part 1-C: damage is cumulative.
+     * Part 1-C:
+     * All reachable Escorts attack once.
+     * Damage is cumulative.
      */
-    for (i = 0;
-         i < field->escortCount;
-         i++) {
+    if (cumulative) {
 
-        if (escortCanHitBattleship(
-                field,
-                i,
-                &hit)) {
+        for (i = 0;
+             i < field->escortCount;
+             i++) {
 
-            if (cumulative == 0) {
+            if (escortCanHitBattleship(
+                    field,
+                    i,
+                    &hit)) {
 
-                field->battleship.alive = 0;
-                field->battleship.health = 0.0;
+                field->battleship
+                    .cumulativeDamage +=
+                    field->escorts[i]
+                    .impactPower;
 
-                printf(
-                    "\nBattleship was destroyed by Escort %d.\n",
-                    field->escorts[i].id
-                );
-
-                hit.targetId =
-                    field->escorts[i].id;
-
-                saveHit(
-                    hitsFile,
-                    &hit,
-                    "Escort"
-                );
-
-                break;
-            }
-            else {
-
-                field->battleship.cumulativeDamage +=
-                    field->escorts[i].impactPower;
-
-                field->battleship.health -=
-                    field->escorts[i].impactPower;
+                field->battleship
+                    .health -=
+                    field->escorts[i]
+                    .impactPower;
 
                 hit.targetId =
                     field->escorts[i].id;
@@ -285,13 +368,17 @@ void runPart1A(
                     "Escort"
                 );
 
-                if (field->battleship.health <= 0.0) {
+                if (field->battleship
+                        .health <= 0.0) {
 
-                    field->battleship.health = 0.0;
-                    field->battleship.alive = 0;
+                    field->battleship
+                        .health = 0.0;
+
+                    field->battleship
+                        .alive = 0;
 
                     printf(
-                        "\nBattleship was destroyed after cumulative damage.\n"
+                        "\nBattleship destroyed by cumulative damage.\n"
                     );
 
                     break;
@@ -301,8 +388,8 @@ void runPart1A(
     }
 
     /*
-     * If B is still alive,
-     * attack all reachable Escorts.
+     * If B survives,
+     * destroy reachable Escorts.
      */
     if (field->battleship.alive) {
 
@@ -316,13 +403,19 @@ void runPart1A(
                     1.0,
                     &hit)) {
 
-                field->escorts[i].alive = 0;
-                field->escorts[i].health = 0.0;
+                field->escorts[i]
+                    .alive = 0;
+
+                field->escorts[i]
+                    .health = 0.0;
 
                 hitCount++;
 
-                if (hit.time > battleTime) {
-                    battleTime = hit.time;
+                if (hit.time >
+                    battleTime) {
+
+                    battleTime =
+                        hit.time;
                 }
 
                 saveHit(
@@ -346,13 +439,14 @@ void runPart1A(
         if (cumulative) {
 
             printf(
-                "Battleship remaining health: %.2f\n",
+                "Battleship health: %.2f\n",
                 field->battleship.health
             );
 
             printf(
                 "Cumulative damage: %.2f\n",
-                field->battleship.cumulativeDamage
+                field->battleship
+                    .cumulativeDamage
             );
         }
     }
@@ -364,6 +458,7 @@ void runPart1A(
     );
 }
 
+
 /* Part 1-B path simulation */
 void runPart1B(
     const Battlefield *original,
@@ -372,26 +467,38 @@ void runPart1B(
     int cumulative)
 {
     Battlefield field;
+
     int i;
     int p;
 
     field = *original;
 
-    printf("\n--- Part 1-B Path Simulation ---\n");
+    /*
+     * Same seed means Simulation 1 and 2
+     * can use the same generated path.
+     */
+    srand(original->seed);
+
+    printf(
+        "\n--- Part 1-B Path Simulation ---\n"
+    );
 
     for (p = 0;
          p < points &&
          field.battleship.alive;
          p++) {
 
-        /* Generate simple random path point */
         field.battleship.x =
-            (double)(rand() %
-            ((int)field.size + 1));
+            (double)(
+                rand() %
+                ((int)field.size + 1)
+            );
 
         field.battleship.y =
-            (double)(rand() %
-            ((int)field.size + 1));
+            (double)(
+                rand() %
+                ((int)field.size + 1)
+            );
 
         printf(
             "\nIteration %d - B position (%.2f, %.2f)\n",
@@ -400,10 +507,7 @@ void runPart1B(
             field.battleship.y
         );
 
-        /*
-         * Escort attacks.
-         * Destroyed escorts stay destroyed.
-         */
+        /* Escort attacks */
         for (i = 0;
              i < field.escortCount;
              i++) {
@@ -417,24 +521,35 @@ void runPart1B(
 
                 if (cumulative) {
 
-                    field.battleship.health -=
-                        field.escorts[i].impactPower;
+                    field.battleship
+                        .health -=
+                        field.escorts[i]
+                            .impactPower;
 
-                    field.battleship.cumulativeDamage +=
-                        field.escorts[i].impactPower;
+                    field.battleship
+                        .cumulativeDamage +=
+                        field.escorts[i]
+                            .impactPower;
 
-                    if (field.battleship.health <= 0.0) {
+                    if (field.battleship
+                            .health <= 0.0) {
 
-                        field.battleship.health = 0.0;
-                        field.battleship.alive = 0;
+                        field.battleship
+                            .health = 0.0;
+
+                        field.battleship
+                            .alive = 0;
 
                         break;
                     }
                 }
                 else {
 
-                    field.battleship.alive = 0;
-                    field.battleship.health = 0.0;
+                    field.battleship
+                        .alive = 0;
+
+                    field.battleship
+                        .health = 0.0;
 
                     break;
                 }
@@ -451,10 +566,7 @@ void runPart1B(
             break;
         }
 
-        /*
-         * B attacks Escorts.
-         * jamAngle > 0 means gun is restricted.
-         */
+        /* Battleship attacks */
         for (i = 0;
              i < field.escortCount;
              i++) {
@@ -462,10 +574,15 @@ void runPart1B(
             HitRecord hit;
             double minimumAngle = 1.0;
 
+            /*
+             * Simple assumption:
+             * gun jams halfway through path.
+             */
             if (jamAngle > 0.0 &&
                 p >= points / 2) {
 
-                minimumAngle = jamAngle;
+                minimumAngle =
+                    jamAngle;
             }
 
             if (battleshipCanHitEscort(
@@ -474,8 +591,11 @@ void runPart1B(
                     minimumAngle,
                     &hit)) {
 
-                field.escorts[i].alive = 0;
-                field.escorts[i].health = 0.0;
+                field.escorts[i]
+                    .alive = 0;
+
+                field.escorts[i]
+                    .health = 0.0;
             }
         }
 
@@ -497,5 +617,611 @@ void runPart1B(
         }
     }
 
-    printf("\nPart 1-B simulation finished.\n");
+    printf(
+        "\nPart 1-B simulation finished.\n"
+    );
+}
+
+
+/* ============================== */
+/* PART 2-A                       */
+/* ============================== */
+
+void runPart2A(
+    Battlefield *field)
+{
+    int order[MAX_ESCORTS];
+    int escortFired[MAX_ESCORTS] = {0};
+
+    int count;
+    int i;
+    int j;
+
+    double currentTime = 0.0;
+
+    char line[200];
+
+    clearResultFile(
+        "results/part2a.txt"
+    );
+
+    count =
+        buildAttackOrder(
+            field,
+            order
+        );
+
+    appendText(
+        "results/part2a.txt",
+        "PART 2-A ATTACK ORDER\n"
+    );
+
+    printf(
+        "\n--- Part 2-A ---\n"
+    );
+
+    printf(
+        "Battleship attack order: "
+    );
+
+    for (i = 0;
+         i < count;
+         i++) {
+
+        printf(
+            "%d ",
+            field->escorts[
+                order[i]
+            ].id
+        );
+
+        snprintf(
+            line,
+            sizeof(line),
+            "Target %d: Escort %d\n",
+            i + 1,
+            field->escorts[
+                order[i]
+            ].id
+        );
+
+        appendText(
+            "results/part2a.txt",
+            line
+        );
+    }
+
+    printf("\n");
+
+    for (i = 0;
+         i < count &&
+         field->battleship.alive;
+         i++) {
+
+        int index =
+            order[i];
+
+        HitRecord shot;
+
+        if (!field->escorts[index]
+                .alive) {
+
+            continue;
+        }
+
+        /*
+         * Battleship fires at
+         * selected target.
+         */
+        if (battleshipCanHitEscort(
+                field,
+                index,
+                1.0,
+                &shot)) {
+
+            field->escorts[index]
+                .alive = 0;
+
+            field->escorts[index]
+                .health = 0.0;
+
+            field->battleship
+                .firingCount++;
+
+            snprintf(
+                line,
+                sizeof(line),
+                "Time %.2f: B destroyed Escort %d\n",
+                currentTime,
+                field->escorts[index].id
+            );
+
+            appendText(
+                "results/part2a.txt",
+                line
+            );
+
+            printf(
+                "Time %.2f: B destroyed Escort %d\n",
+                currentTime,
+                field->escorts[index].id
+            );
+        }
+
+        /*
+         * Time passes before
+         * next B firing.
+         */
+        currentTime +=
+            field->battleship
+                .firingInterval;
+
+        /*
+         * Each remaining Escort
+         * may attack once.
+         */
+        for (j = 0;
+             j < field->escortCount;
+             j++) {
+
+            HitRecord escortShot;
+
+            if (!field->escorts[j]
+                    .alive ||
+                escortFired[j]) {
+
+                continue;
+            }
+
+            if (escortCanHitBattleship(
+                    field,
+                    j,
+                    &escortShot)) {
+
+                escortFired[j] = 1;
+
+                field->battleship
+                    .health -=
+                    field->escorts[j]
+                        .impactPower;
+
+                field->battleship
+                    .cumulativeDamage +=
+                    field->escorts[j]
+                        .impactPower;
+
+                if (field->battleship
+                        .health <= 0.0) {
+
+                    field->battleship
+                        .health = 0.0;
+
+                    field->battleship
+                        .alive = 0;
+
+                    printf(
+                        "Battleship destroyed.\n"
+                    );
+
+                    break;
+                }
+            }
+        }
+    }
+
+    saveBattlefield(
+        field,
+        "results/part2a_final.txt",
+        "Part 2-A Final Battlefield"
+    );
+
+    printf(
+        "Part 2-A finished at %.2f seconds.\n",
+        currentTime
+    );
+}
+
+
+/* ============================== */
+/* PART 2-B                       */
+/* ============================== */
+
+void runPart2B(
+    Battlefield *field,
+    double maximumTime)
+{
+    double currentTime = 0.0;
+    double nextBFire = 0.0;
+
+    double nextEscortFire[
+        MAX_ESCORTS
+    ] = {0.0};
+
+    int i;
+
+    char line[200];
+
+    clearResultFile(
+        "results/part2b.txt"
+    );
+
+    printf(
+        "\n--- Part 2-B ---\n"
+    );
+
+    while (
+        currentTime <= maximumTime &&
+        field->battleship.alive &&
+        countAliveEscorts(field) > 0) {
+
+        /*
+         * Battleship firing event.
+         */
+        if (currentTime >= nextBFire) {
+
+            int order[MAX_ESCORTS];
+            int count;
+            int position;
+
+            count =
+                buildAttackOrder(
+                    field,
+                    order
+                );
+
+            for (position = 0;
+                 position < count;
+                 position++) {
+
+                int index =
+                    order[position];
+
+                HitRecord shot;
+
+                if (battleshipCanHitEscort(
+                        field,
+                        index,
+                        1.0,
+                        &shot)) {
+
+                    field->escorts[index]
+                        .alive = 0;
+
+                    field->escorts[index]
+                        .health = 0.0;
+
+                    field->battleship
+                        .firingCount++;
+
+                    snprintf(
+                        line,
+                        sizeof(line),
+                        "Time %.2f: B destroyed Escort %d\n",
+                        currentTime,
+                        field->escorts[index].id
+                    );
+
+                    appendText(
+                        "results/part2b.txt",
+                        line
+                    );
+
+                    break;
+                }
+            }
+
+            nextBFire +=
+                field->battleship
+                    .firingInterval;
+        }
+
+        /*
+         * Escort firing events.
+         */
+        for (i = 0;
+             i < field->escortCount;
+             i++) {
+
+            HitRecord shot;
+
+            if (!field->escorts[i]
+                    .alive) {
+
+                continue;
+            }
+
+            if (currentTime >=
+                nextEscortFire[i]) {
+
+                if (escortCanHitBattleship(
+                        field,
+                        i,
+                        &shot)) {
+
+                    field->battleship
+                        .health -=
+                        field->escorts[i]
+                            .impactPower;
+
+                    field->battleship
+                        .cumulativeDamage +=
+                        field->escorts[i]
+                            .impactPower;
+
+                    field->escorts[i]
+                        .firingCount++;
+
+                    snprintf(
+                        line,
+                        sizeof(line),
+                        "Time %.2f: Escort %d hit B\n",
+                        currentTime,
+                        field->escorts[i].id
+                    );
+
+                    appendText(
+                        "results/part2b.txt",
+                        line
+                    );
+
+                    if (field->battleship
+                            .health <= 0.0) {
+
+                        field->battleship
+                            .health = 0.0;
+
+                        field->battleship
+                            .alive = 0;
+
+                        break;
+                    }
+                }
+
+                nextEscortFire[i] +=
+                    field->escorts[i]
+                        .firingInterval;
+            }
+        }
+
+        currentTime += 1.0;
+    }
+
+    saveBattlefield(
+        field,
+        "results/part2b_final.txt",
+        "Part 2-B Final Battlefield"
+    );
+
+    printf(
+        "Part 2-B finished at %.2f seconds.\n",
+        currentTime
+    );
+
+    printf(
+        "Battleship health: %.2f\n",
+        field->battleship.health
+    );
+}
+
+
+/* ============================== */
+/* PART 2-C                       */
+/* ============================== */
+
+void runPart2C(
+    Battlefield *field,
+    double maximumTime)
+{
+    double currentTime = 0.0;
+    double nextBFire = 0.0;
+
+    double nextEscortFire[
+        MAX_ESCORTS
+    ] = {0.0};
+
+    int i;
+
+    char line[220];
+
+    clearResultFile(
+        "results/part2c.txt"
+    );
+
+    printf(
+        "\n--- Part 2-C ---\n"
+    );
+
+    while (
+        currentTime <= maximumTime &&
+        field->battleship.alive &&
+        countAliveEscorts(field) > 0) {
+
+        /*
+         * Battleship firing.
+         * Impact power decreases
+         * using the gamma equation.
+         */
+        if (currentTime >= nextBFire) {
+
+            int order[MAX_ESCORTS];
+            int count;
+            int position;
+
+            count =
+                buildAttackOrder(
+                    field,
+                    order
+                );
+
+            for (position = 0;
+                 position < count;
+                 position++) {
+
+                int index =
+                    order[position];
+
+                HitRecord shot;
+
+                if (battleshipCanHitEscort(
+                        field,
+                        index,
+                        1.0,
+                        &shot)) {
+
+                    field->battleship
+                        .currentImpactPower =
+                        exp(
+                            -field->battleship
+                                .gamma *
+                            field->battleship
+                                .firingCount
+                        );
+
+                    field->escorts[index]
+                        .health -=
+                        field->battleship
+                            .currentImpactPower;
+
+                    field->battleship
+                        .firingCount++;
+
+                    if (field->escorts[index]
+                            .health <= 0.0) {
+
+                        field->escorts[index]
+                            .health = 0.0;
+
+                        field->escorts[index]
+                            .alive = 0;
+                    }
+
+                    snprintf(
+                        line,
+                        sizeof(line),
+                        "Time %.2f: B fired at Escort %d, impact %.3f, remaining health %.3f\n",
+                        currentTime,
+                        field->escorts[index].id,
+                        field->battleship
+                            .currentImpactPower,
+                        field->escorts[index]
+                            .health
+                    );
+
+                    appendText(
+                        "results/part2c.txt",
+                        line
+                    );
+
+                    break;
+                }
+            }
+
+            nextBFire +=
+                field->battleship
+                    .firingInterval;
+        }
+
+        /*
+         * Escort firing.
+         * Each Escort also has
+         * impact degradation.
+         */
+        for (i = 0;
+             i < field->escortCount;
+             i++) {
+
+            HitRecord shot;
+
+            if (!field->escorts[i]
+                    .alive) {
+
+                continue;
+            }
+
+            if (currentTime >=
+                nextEscortFire[i]) {
+
+                if (escortCanHitBattleship(
+                        field,
+                        i,
+                        &shot)) {
+
+                    field->escorts[i]
+                        .currentImpactPower =
+                        field->escorts[i]
+                            .impactPower *
+                        exp(
+                            -field->escorts[i]
+                                .gamma *
+                            field->escorts[i]
+                                .firingCount
+                        );
+
+                    field->battleship
+                        .health -=
+                        field->escorts[i]
+                            .currentImpactPower;
+
+                    field->battleship
+                        .cumulativeDamage +=
+                        field->escorts[i]
+                            .currentImpactPower;
+
+                    field->escorts[i]
+                        .firingCount++;
+
+                    snprintf(
+                        line,
+                        sizeof(line),
+                        "Time %.2f: Escort %d hit B, impact %.3f, B health %.3f\n",
+                        currentTime,
+                        field->escorts[i].id,
+                        field->escorts[i]
+                            .currentImpactPower,
+                        field->battleship
+                            .health
+                    );
+
+                    appendText(
+                        "results/part2c.txt",
+                        line
+                    );
+
+                    if (field->battleship
+                            .health <= 0.0) {
+
+                        field->battleship
+                            .health = 0.0;
+
+                        field->battleship
+                            .alive = 0;
+
+                        break;
+                    }
+                }
+
+                nextEscortFire[i] +=
+                    field->escorts[i]
+                        .firingInterval;
+            }
+        }
+
+        currentTime += 1.0;
+    }
+
+    saveBattlefield(
+        field,
+        "results/part2c_final.txt",
+        "Part 2-C Final Battlefield"
+    );
+
+    printf(
+        "Part 2-C finished at %.2f seconds.\n",
+        currentTime
+    );
+
+    printf(
+        "Battleship health: %.3f\n",
+        field->battleship.health
+    );
 }
